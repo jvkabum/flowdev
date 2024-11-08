@@ -1,25 +1,26 @@
-// src/middleware/validateDays.ts
+import Ticket from '../../models/Ticket';
+import { getDaysToClose } from './ConfiguraFechamentoTicketService';
+import { Op } from 'sequelize';
 
-import { Request, Response, NextFunction } from 'express';
+export class ClosePendingTicketsService {
+    async execute() {
+        const daysToClose = await getDaysToClose(); // Busca o valor configurado
+        const dataLimite = new Date();
+        dataLimite.setDate(dataLimite.getDate() - daysToClose);
 
-// Middleware para validar o valor de 'daysToClose'
-export const validateDaysToCloseTicket = (req: Request, res: Response, next: NextFunction) => {
-  const { daysToClose } = req.body;
+        // Busca tickets com status "pending" que têm a última interação antes da data limite
+        const ticketsPendentes = await Ticket.findAll({
+            where: {
+                status: 'pending', // Corrigido para "pending"
+                updatedAt: { [Op.lt]: dataLimite } // Verificação de interação pela coluna "updatedAt"
+            }
+        });
 
-  // Verifica se 'daysToClose' é um número
-  if (typeof daysToClose !== 'number') {
-    return res.status(400).json({
-      message: "'daysToClose' deve ser um número."
-    });
-  }
+        for (const ticket of ticketsPendentes) {
+            ticket.status = 'closed'; // Atualiza o status para "closed"
+            await ticket.save();
+            console.log(`Ticket ${ticket.id} fechado automaticamente.`);
+        }
+    }
+}
 
-  // Verifica se 'daysToClose' está dentro do intervalo permitido (1 a 365 dias)
-  if (daysToClose < 1 || daysToClose > 365) {
-    return res.status(400).json({
-      message: "'daysToClose' deve ser um número entre 1 e 365."
-    });
-  }
-
-  // Se a validação passar, chama o próximo middleware
-  next();
-};

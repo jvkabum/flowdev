@@ -7,13 +7,17 @@ interface ConfigResult {
 
 export const getDaysToClose = async (): Promise<number> => {
   try {
-    const result = await db.query('SELECT value FROM settings WHERE key = $1', {
-      replacements: ['DAYS_TO_CLOSE_TICKET']
-    });
+    const result = await db.query<ConfigResult[]>(
+      'SELECT value FROM settings WHERE key = $1',
+      {
+        bind: ['DAYS_TO_CLOSE_TICKET'], // Use bind para Sequelize no raw query
+        type: db.QueryTypes.SELECT // Define o tipo para retornar um array de resultados
+      }
+    );
 
     // Verificar o retorno correto do resultado
-    if (result && result[0] && result[0][0]) {
-      return parseInt((result[0][0] as ConfigResult)?.value) || 0;
+    if (result && result.length > 0) {
+      return parseInt(result[0].value) || 0;
     } else {
       // Caso o resultado não seja encontrado, retorne 0 por padrão
       return 0;
@@ -27,11 +31,16 @@ export const getDaysToClose = async (): Promise<number> => {
 
 export const setDaysToClose = async (days: number): Promise<void> => {
   try {
-    await db.query('UPDATE settings SET value = $1 WHERE key = $2', {
-      replacements: [days, 'DAYS_TO_CLOSE_TICKET']
-    });
+    await db.query(
+      'UPDATE settings SET value = $1 WHERE key = $2',
+      {
+        bind: [days.toString(), 'DAYS_TO_CLOSE_TICKET'], // Convertendo days para string
+        type: db.QueryTypes.UPDATE // Define o tipo para uma operação de atualização
+      }
+    );
   } catch (error) {
     // Tratar erro de atualização
     console.error('Erro ao atualizar DAYS_TO_CLOSE_TICKET:', error);
   }
 };
+
