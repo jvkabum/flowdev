@@ -200,7 +200,6 @@
 <script>
 import { ListarChatFlow } from 'src/service/chatFlow'
 import { ListarConfiguracoes, AlterarConfiguracao } from 'src/service/configuracoes'
-import axios from 'axios'
 
 export default {
   name: 'IndexConfiguracoes',
@@ -228,9 +227,6 @@ export default {
         if (el.key === 'botTicketActive' && el.value) {
           value = +el.value
         }
-        if (el.key === 'daysToClose') {
-          this.daysToClose = value // Configuração de fechamento de tickets
-        }
         this.$data[el.key] = value
       })
     },
@@ -238,16 +234,17 @@ export default {
       const { data } = await ListarChatFlow()
       this.listaChatFlow = data.chatFlow
     },
-    async atualizarConfiguracao (key) {
+    async atualizarConfiguracao (key, value = null) {
       const params = {
         key,
-        value: this.$data[key]
+        value: value !== null ? value : this.$data[key]
       }
       try {
+        // Atualiza a configuração
         await AlterarConfiguracao(params)
         this.$q.notify({
           type: 'positive',
-          message: 'Configuração alterada!',
+          message: 'Configuração alterada com sucesso!',
           progress: true,
           actions: [{
             icon: 'close',
@@ -255,48 +252,22 @@ export default {
             color: 'white'
           }]
         })
+      } catch (error) {
+        console.error('Erro ao alterar configuração:', error)
 
-        // Se for a configuração de dias para fechar tickets, chamar a API
-        if (key === 'daysToClose') {
-          await this.salvarFechamentoTicket()
+        // Verificação da estrutura do erro
+        if (error && error.response && error.response.data) {
+          this.$notificarErro('Erro ao alterar configuração', error.response.data.message)
+        } else {
+          this.$notificarErro('Erro desconhecido', 'Ocorreu um erro ao tentar alterar a configuração')
         }
-      } catch (error) {
-        console.error('Erro ao alterar configuração', error)
-        this.$data[key] = this.$data[key] === 'enabled' ? 'disabled' : 'enabled'
-        this.$notificarErro('Ocorreu um erro!', error)
-      }
-    },
-    async salvarFechamentoTicket () {
-      try {
-        // Enviar a configuração de dias para a API (salvar no backend)
-        await axios.post('/api/configuracoes/ticket-close-days', { daysToClose: this.daysToClose })
-        this.$q.notify({
-          type: 'positive',
-          message: 'Configuração de fechamento de ticket salva com sucesso!'
-        })
-      } catch (error) {
-        console.error('Erro ao salvar configuração de fechamento de ticket', error)
-        this.$q.notify({
-          type: 'negative',
-          message: 'Erro ao salvar configuração de fechamento de ticket.'
-        })
       }
     }
   },
   async mounted () {
     this.userProfile = localStorage.getItem('profile')
-    if (this.userProfile === 'admin') {
-      console.log('Perfil de administrador detectado')
-      await this.listarConfiguracoes()
-      if (!this.daysToClose) {
-        console.warn('daysToClose não foi carregado corretamente')
-      }
-      await this.listarChatFlow()
-    }
-    this.$forceUpdate() // Força uma nova renderização
+    this.listarConfiguracoes()
+    this.listarChatFlow()
   }
 }
 </script>
-
-<style lang="scss" scoped>
-</style>
